@@ -1,12 +1,28 @@
-provider:
-  - name: aws
-    region: ap-northeast-2
-    assume_role:
-      role_arn: "1"
-      session_name: "2"
+default_tags: &default_tags
+  ManagedByTerraform: true
+  State: {{metadata "state"}}
+  Proejct: {{metadata "project"}}
+
+aws_provider:
+  - name: default
+    region: {{metadata "region"}}
+    default_tags:
+      <<: *default_tags
+      Region: {{metadata "region"}}
+  - name: use1
+    region: us-east-1
+    default_tags:
+      <<: *default_tags
+      Region: us-east-1
+    condition:
+      - {{need_multiple_provider}}
+
+s3_backend:
+  bucket: mybucket
+  key   : path/to/my/key
+  region: us-east-1
 
 variable:
   - name : test
     type: string
     description: this is test
-    default: test

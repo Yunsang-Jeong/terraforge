@@ -1,15 +1,12 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/Yunsang-Jeong/terraforge/internal/config"
+	"github.com/Yunsang-Jeong/terraforge/internal/app"
 )
 
 func main() {
-	config := config.NewConfig()
-	config.LoadConfigFromFile()
-
-	block := config.GetConfig()
-	fmt.Printf("%v", block)
+	app := app.NewApp(true)
+	if err := app.Run(); err != nil {
+		panic(err)
+	}
 }

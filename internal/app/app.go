@@ -1,43 +1,45 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/Yunsang-Jeong/terraforge/internal/logger"
+	"github.com/Yunsang-Jeong/terraforge/internal/util"
 )
 
-type app struct {
+type terraforge struct {
 	lg       logger.Logger
-	config   *Config
+	config   Config
 	metadata map[string]string
 }
 
-func NewApp(debug bool) *app {
-	return &app{
+func NewTerraforge(debug bool) *terraforge {
+	return &terraforge{
 		lg:       logger.NewSimpleLogger(debug),
-		config:   &Config{},
+		config:   Config{},
 		metadata: map[string]string{},
 	}
 }
 
-func (a *app) Run() error {
-	if err := a.parseMetadata(); err != nil {
-		return err
-	}
-	a.lg.Debug("parsed metadata", "metadata", a.metadata)
-
-	if err := a.parseConfig(); err != nil {
-		return err
-	}
-	a.lg.Debug("parsed aws_provider", "aws_provider", fmt.Sprintf("%+v", a.config.AWSProviders))
-	a.lg.Debug("parsed s3_backend", "s3_backend", fmt.Sprintf("%+v", a.config.S3Backend))
-	a.lg.Debug("parsed variable", "variable", fmt.Sprintf("%+v", a.config.Variables))
-
-	if err := a.generateTerraformConfiguration(); err != nil {
+func (app *terraforge) Run(configFile string) error {
+	rawConfig, err := util.GetSomethingInParents(".", configFile)
+	if err != nil {
 		return err
 	}
 
-	fmt.Print(a.config)
+	if err := app.parseMetadataAndSave(rawConfig); err != nil {
+		return err
+	}
+
+	if err := app.parseConfigAndSave(rawConfig); err != nil {
+		return err
+	}
+
+	if err := app.generateAWSProvider("provider.tf"); err != nil {
+		return err
+	}
+
+	if err := app.generateVariable("variable.tf"); err != nil {
+		return err
+	}
 
 	return nil
 }

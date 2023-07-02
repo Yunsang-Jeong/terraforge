@@ -1,12 +1,14 @@
 package main
 
 import (
+	"os"
+
 	"github.com/Yunsang-Jeong/terraforge/internal/app"
 )
 
 func main() {
-	app := app.NewApp(true)
-	if err := app.Run(); err != nil {
-		panic(err)
+	app := app.NewTerraforge(true)
+	if err := app.Run("terraforge.yaml"); err != nil {
+		os.Exit(1)
 	}
 }

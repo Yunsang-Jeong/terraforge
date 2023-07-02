@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"text/template"
 
-	"github.com/Yunsang-Jeong/terraforge/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,12 +14,12 @@ type Config struct {
 }
 
 type AWSProvider struct {
-	Name              string            `yaml:"name"`
+	Name              string            `yaml:"name", hcl:"name"`
 	Region            string            `yaml:"region"`
 	DefaultTags       map[string]string `yaml:"default_tags,omitempty"`
 	AssumeRoleArn     string            `yaml:"asssume_role_arn,omitempty"`
 	AssumeSessionName string            `yaml:"asssume_session_name,omitempty"`
-	Condtion          []string          `yaml:"condition,omitempty"`
+	Condtion          []bool            `yaml:"condition,omitempty"`
 }
 
 type S3Backend struct {
@@ -36,59 +35,48 @@ type Variable struct {
 	Default     interface{} `yaml:"default,omitempty"`
 }
 
-const configName = "terraforge.yaml"
-
-func (a *app) parseConfig() error {
-	configRelPath, err := util.GetSomethingPath(".", configName, true)
-	if err != nil {
-		a.lg.Error(err.Error(), "configName", configName)
-		return err
-	}
-
-	rawConfig, err := util.LoadFileAsString(configRelPath)
-	if err != nil {
-		a.lg.Error(err.Error(), "configRelPath", configRelPath)
-		return err
-	}
-
+// equalMetadata
+func (app *terraforge) parseConfigAndSave(rawConfig string) error {
 	configFunc := template.FuncMap{
-		"metadata":               a.metadataTmplFunc,
-		"need_multiple_provider": a.needMultipleProviderTmplFunc,
+		"metadata":               app.metadataTmplFunc,
+		"metadataIfEqual":        app.metadataIfEqualTmplFunc,
+		"need_multiple_provider": app.needMultipleProviderTmplFunc,
 	}
 
 	tmpl, err := template.New("config").Funcs(configFunc).Parse(rawConfig)
 	if err != nil {
-		a.lg.Error(err.Error(), "rawConfig", rawConfig)
+		app.lg.Error("fail to initialize to execute config-functions", "rawConfig", rawConfig, "err", err.Error())
 		return err
 	}
 
 	var executedRawConfig bytes.Buffer
 	if err := tmpl.Execute(&executedRawConfig, nil); err != nil {
-		a.lg.Error(err.Error(), "rawConfig", rawConfig)
+		app.lg.Error("fail to execute config-functions", "rawConfig", rawConfig, "err", err.Error())
 		return err
 	}
 
 	config := Config{}
 	if err := yaml.Unmarshal(executedRawConfig.Bytes(), &config); err != nil {
-		a.lg.Error(err.Error(), "rawConfig", rawConfig)
+		app.lg.Error("fail to parse config-function-executed config ", "executedRawConfig", executedRawConfig.String(), "err", err.Error())
 		return err
 	}
 
-	a.config = &config
+	app.config = config
 
 	return nil
 }
 
-//lint:ignore U1000 Ignore template function
-func (a *app) metadataTmplFunc(target string) string {
-	if value, ok := a.metadata[target]; ok {
-		return value
-	}
-
-	return "NotFound"
+func (a *terraforge) metadataTmplFunc(key string) string {
+	return a.metadata[key]
 }
 
-//lint:ignore U1000 Ignore template function
-func (a *app) needMultipleProviderTmplFunc() interface{} {
+func (a *terraforge) metadataIfEqualTmplFunc(key string, compreMetadata string, compareValue string) string {
+	if a.metadata[compreMetadata] == compareValue {
+		return a.metadata[key]
+	}
+	return ""
+}
+
+func (a *terraforge) needMultipleProviderTmplFunc() bool {
 	return false
 }

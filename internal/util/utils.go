@@ -8,7 +8,21 @@ import (
 
 const MAX_DIR_DEPTH = 100
 
-func GetSomethingPath(base string, something string, returnRelPath bool) (string, error) {
+func GetSomethingInParents(base string, something string) (string, error) {
+	relPath, err := GetSomethingPathInParents(".", something, true)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := LoadFileAsString(relPath)
+	if err != nil {
+		return "", err
+	}
+
+	return data, nil
+}
+
+func GetSomethingPathInParents(base string, something string, returnRelPath bool) (string, error) {
 	baseAbsPath, err := filepath.Abs(base)
 	if err != nil {
 		return "", err

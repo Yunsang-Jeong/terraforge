@@ -1,7 +1,10 @@
+metafiles:
+  - metadata.yaml
+
 default_tags: &default_tags
   ManagedByTerraform: true
-  State: {{metadata "state"}}
   Proejct: {{metadata "project"}}
+  Owner: {{metadataIfEqual "owner" "env" "prod"}}
 
 aws_provider:
   - name: default
@@ -9,6 +12,13 @@ aws_provider:
     default_tags:
       <<: *default_tags
       Region: {{metadata "region"}}
+  - name: apne2
+    region: ap-nortehast-2
+    default_tags:
+      <<: *default_tags
+      Region: ap-nortehast-2
+    condition:
+      - {{need_multiple_provider}}
   - name: use1
     region: us-east-1
     default_tags:
@@ -20,9 +30,21 @@ aws_provider:
 s3_backend:
   bucket: mybucket
   key   : path/to/my/key
-  region: us-east-1
+  region: ap-nortehast-2
 
 variable:
-  - name : test
+  - name : project
     type: string
-    description: this is test
+    default: {{metadata "project"}}
+  - name : owner
+    type: string
+    default: {{metadata "owner"}}
+  - name : region
+    type: string
+    default: {{metadata "region"}}
+  - name : env
+    type: string
+    default: {{metadata "env"}}
+  - name : env2
+    type: list(string)
+    default: []

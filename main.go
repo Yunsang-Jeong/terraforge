@@ -8,7 +8,7 @@ import (
 
 func main() {
 	app := app.NewTerraforge(true)
-	if err := app.Run("terraforge.yaml"); err != nil {
+	if err := app.Run("terraforge.hcl"); err != nil {
 		os.Exit(1)
 	}
 }

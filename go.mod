@@ -7,13 +7,11 @@ require (
 	github.com/hashicorp/hcl/v2 v2.17.0
 	github.com/zclconf/go-cty v1.13.2
 	go.uber.org/zap v1.21.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/agext/levenshtein v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
-	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect

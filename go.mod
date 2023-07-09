@@ -6,6 +6,7 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/hashicorp/hcl/v2 v2.17.0
 	github.com/hashicorp/terraform v0.15.3
+	github.com/spf13/afero v1.2.2
 	github.com/zclconf/go-cty v1.13.2
 	go.uber.org/zap v1.21.0
 )

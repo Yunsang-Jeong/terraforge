@@ -78,3 +78,14 @@ func (l *simpleLogger) Debug(msg string, keysAndValues ...interface{}) {
 func (l *simpleLogger) Error(msg string, keysAndValues ...interface{}) {
 	l.errorLogger.Errorw(color.HiMagentaString(msg), keysAndValues...)
 }
+
+// func (l *simpleLogger) Diags(diags hcl.Diagnostics) {
+// 	for _, diag := range diags {
+// 		switch diag.Severity {
+// 		case hcl.DiagWarning:
+// 			l.Debug(diag.Summary, "detail", diag.Detail)
+// 		case hcl.DiagError:
+// 			l.Error(diag.Summary, "detail", diag.Detail)
+// 		}
+// 	}
+// }

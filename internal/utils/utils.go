@@ -1,7 +1,8 @@
-package util
+package utils
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -54,6 +55,7 @@ func GetSomethingPathInParents(base string, something string, returnRelPath bool
 }
 
 func LoadFileAsString(path string) (string, error) {
+	fmt.Println(path)
 	if !IsFile(path) {
 		return "", errors.New("this is not file")
 	}

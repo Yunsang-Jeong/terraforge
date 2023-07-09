@@ -12,7 +12,6 @@ type Metafile struct {
 }
 
 func decodeMetafileBlock(block *hclsyntax.Block, ctx *hcl.EvalContext) (*Metafile, error) {
-
 	attr, ok := block.Body.Attributes["path"]
 	if !ok {
 		return nil, errors.New("invalid metafile block. metafile block must have path attirbute only")

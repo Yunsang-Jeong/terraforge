@@ -108,7 +108,7 @@ func (p *Parser) LoadConfigFile(configFile string) (*Config, error) {
 func (p *Parser) loadHCLFile(filename string) (*hclsyntax.Body, error) {
 	path, err := utils.GetSomethingPathInParents(p.wd, filename, true)
 	if err != nil {
-		p.lg.Error("failed to get hcl file path", "err", err, "filename", filename)
+		p.lg.Error("failed to get hcl file path", "err", err, "filename", filename, "wd", p.wd)
 		return nil, err
 	}
 

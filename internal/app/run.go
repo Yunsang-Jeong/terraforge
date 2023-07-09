@@ -4,7 +4,6 @@ import (
 	"github.com/Yunsang-Jeong/terraforge/internal/configs"
 	"github.com/Yunsang-Jeong/terraforge/internal/logger"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/spf13/afero"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/function"
@@ -17,15 +16,6 @@ type terraforge struct {
 	wd  string
 	cf  string
 }
-
-type generateBlock struct {
-	labels []string
-	config *hclsyntax.Block
-}
-
-type metadata map[string]cty.Value
-
-type generateBlocks map[string][]generateBlock
 
 func NewTerraforge(workingDir string, configFile string, debug bool) *terraforge {
 	return &terraforge{
@@ -41,17 +31,16 @@ func NewTerraforge(workingDir string, configFile string, debug bool) *terraforge
 }
 
 func (app *terraforge) Run() error {
-	parser := configs.NewParser(app.wd, app.fs)
+	parser := configs.NewParser(app.lg, app.wd, app.fs)
 
-	config, diag := parser.LoadConfigFile(app.cf)
-	if diag.HasErrors() {
-		app.lg.Error(diag.Error())
+	config, err := parser.LoadConfigFile(app.cf)
+	if err != nil {
+		app.lg.Error("fail to load config file", "err", err)
 		return nil
 	}
 
-	diag = config.GenerateTFConfig(app.wd, app.fs)
-	if diag.HasErrors() {
-		app.lg.Error(diag.Error())
+	if err := config.GenerateTFConfig(app.wd, app.fs); err != nil {
+		app.lg.Error("fail to generate terraform config", "err", err)
 		return nil
 	}
 

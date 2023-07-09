@@ -1,6 +1,7 @@
 package configs
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -17,9 +18,7 @@ type Config struct {
 	Ctx       *hcl.EvalContext
 }
 
-func (c *Config) GenerateTFConfig(workingDir string, fs afero.Afero) hcl.Diagnostics {
-	var diags hcl.Diagnostics
-
+func (c *Config) GenerateTFConfig(workingDir string, fs afero.Afero) error {
 	for label0, generates := range c.Generates {
 		file := hclwrite.NewEmptyFile()
 		body := file.Body()
@@ -29,42 +28,58 @@ func (c *Config) GenerateTFConfig(workingDir string, fs afero.Afero) hcl.Diagnos
 				continue
 			}
 
-			newBlock := body.AppendNewBlock(label0, generate.Labels[1:])
-			newBlockBody := newBlock.Body()
+			ctx := c.Ctx.NewChild()
+			ctx.Variables = map[string]cty.Value{}
 
-			diag := appendBlockContent(newBlockBody, generate.Config, c.Ctx)
-			diags = append(diags, diag...)
-			if diags.HasErrors() {
-				return diags
-			}
+			if generate.ForEach != nil {
+				for key, value := range generate.ForEach {
+					ctx.Variables = map[string]cty.Value{
+						"each": cty.ObjectVal(map[string]cty.Value{
+							"key":   cty.StringVal(key),
+							"value": value,
+						}),
+					}
 
-			if index < len(generate.Config.Blocks)-1 {
-				body.AppendNewline()
+					newBlock := body.AppendNewBlock(label0, generate.Labels[1:])
+					newBlockBody := newBlock.Body()
+
+					if err := appendBlockContent(newBlockBody, generate.Config, ctx); err != nil {
+						return err
+					}
+
+					if index < len(generate.Config.Blocks)-1 {
+						body.AppendNewline()
+					}
+				}
+			} else {
+				newBlock := body.AppendNewBlock(label0, generate.Labels[1:])
+				newBlockBody := newBlock.Body()
+
+				if err := appendBlockContent(newBlockBody, generate.Config, ctx); err != nil {
+					return err
+				}
+
+				if index < len(generate.Config.Blocks)-1 {
+					body.AppendNewline()
+				}
 			}
 		}
 
 		filename := filepath.Join(workingDir, fmt.Sprintf("%s.tf", label0))
 		if err := fs.WriteFile(filename, file.Bytes(), 0644); err != nil {
-			return diags.Append(&hcl.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  "F metafile block",
-				Detail:   "metafile block must have path attirbute only",
-			})
+			return err
 		}
 	}
 
 	return nil
 }
 
-func appendBlockContent(file *hclwrite.Body, config *hclsyntax.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
-	var diags hcl.Diagnostics
-
+func appendBlockContent(file *hclwrite.Body, config *hclsyntax.Body, ctx *hcl.EvalContext) error {
 	attributes := map[string]cty.Value{}
 	for name, attribute := range config.Attributes {
-		value, diag := attribute.Expr.Value(ctx)
-		diags = append(diags, diag...)
+		value, diags := attribute.Expr.Value(ctx)
 		if diags.HasErrors() {
-			return diags
+			return errors.Join(diags.Errs()...)
 		}
 
 		attributes[name] = value
@@ -78,11 +93,10 @@ func appendBlockContent(file *hclwrite.Body, config *hclsyntax.Body, ctx *hcl.Ev
 		blockInBlock := file.AppendNewBlock(block.Type, []string{})
 		blockInBlockBody := blockInBlock.Body()
 
-		diag := appendBlockContent(blockInBlockBody, block.Body, ctx)
-		diags = append(diags, diag...)
-		if diags.HasErrors() {
-			return diags
+		if err := appendBlockContent(blockInBlockBody, block.Body, ctx); err != nil {
+			return err
 		}
 	}
-	return diags
+
+	return nil
 }

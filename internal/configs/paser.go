@@ -1,9 +1,10 @@
 package configs
 
 import (
-	"fmt"
+	"errors"
 	"path/filepath"
 
+	"github.com/Yunsang-Jeong/terraforge/internal/logger"
 	"github.com/Yunsang-Jeong/terraforge/internal/utils"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -15,26 +16,26 @@ import (
 )
 
 type Parser struct {
+	lg logger.Logger
 	fs afero.Afero
 	p  *hclparse.Parser
 	wd string
 }
 
-func NewParser(workingDir string, fs afero.Afero) *Parser {
+func NewParser(lg logger.Logger, workingDir string, fs afero.Afero) *Parser {
 	return &Parser{
+		lg: lg,
 		fs: fs,
 		p:  hclparse.NewParser(),
 		wd: workingDir,
 	}
 }
 
-func (p *Parser) LoadConfigFile(configFile string) (*Config, hcl.Diagnostics) {
-	var diags hcl.Diagnostics
-
-	body, diag := p.loadHCLFile(configFile)
-	if diag.HasErrors() {
-		diags = append(diags, diag...)
-		return nil, diags
+func (p *Parser) LoadConfigFile(configFile string) (*Config, error) {
+	body, err := p.loadHCLFile(configFile)
+	if err != nil {
+		p.lg.Error("fail to load config file")
+		return nil, nil
 	}
 
 	blocks := map[string][]*hclsyntax.Block{}
@@ -59,28 +60,29 @@ func (p *Parser) LoadConfigFile(configFile string) (*Config, hcl.Diagnostics) {
 	metadata := map[string]cty.Value{}
 
 	if len(blocks["metafile"]) > 1 {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Too many metafile block",
-			Detail:   "No more than one metadata block can exist",
-		})
+		p.lg.Error("no more than one metadata block can exist")
+		return nil, errors.New("too many metafile block")
 	}
 
 	for _, block := range blocks["metafile"] {
-		metafileBlock, diag := decodeMetafileBlock(block, nil)
-		diags = append(diags, diag...)
+		metafileBlock, err := decodeMetafileBlock(block, nil)
+		if err != nil {
+			p.lg.Error("fail to decode metafile block")
+			return nil, err
+		}
 
 		for _, metafile := range metafileBlock.Paths {
-
-			metafileBody, diag := p.loadHCLFile(metafile)
-			diags = append(diags, diag...)
-			if metafileBody == nil {
-				return nil, diags
+			metafileBody, err := p.loadHCLFile(metafile)
+			if err != nil {
+				p.lg.Error("fail to load metafile")
+				return nil, err
 			}
 
 			for name, attr := range metafileBody.Attributes {
-				value, diag := attr.Expr.Value(nil)
-				diags = append(diags, diag...)
+				value, diags := attr.Expr.Value(nil)
+				if diags.HasErrors() {
+					return nil, errors.Join(diags.Errs()...)
+				}
 
 				metadata[name] = value
 			}
@@ -91,40 +93,36 @@ func (p *Parser) LoadConfigFile(configFile string) (*Config, hcl.Diagnostics) {
 	config.Generates = map[string][]*Generate{}
 
 	for _, block := range blocks["generate"] {
-		generateBlock, diag := decodeGenerateBlock(block, config.Ctx)
-		diags = append(diags, diag...)
+		generateBlock, err := decodeGenerateBlock(block, config.Ctx)
+		if err != nil {
+			p.lg.Error("fail to decode generate block")
+			return nil, err
+		}
 
 		config.Generates[block.Labels[0]] = append(config.Generates[block.Labels[0]], generateBlock)
 	}
 
-	return config, diags
+	return config, nil
 }
 
-func (p *Parser) loadHCLFile(filename string) (*hclsyntax.Body, hcl.Diagnostics) {
-	var diags hcl.Diagnostics
-
+func (p *Parser) loadHCLFile(filename string) (*hclsyntax.Body, error) {
 	path, err := utils.GetSomethingPathInParents(p.wd, filename, true)
 	if err != nil {
-		return nil, diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Failed to get hcl file path",
-			Detail:   fmt.Sprintf("The file %s could not be read.", filename),
-		})
+		p.lg.Error("failed to get hcl file path", "err", err, "filename", filename)
+		return nil, err
 	}
 
 	src, err := p.fs.ReadFile(filepath.Join(p.wd, path))
 	if err != nil {
-		return nil, diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Failed to read hcl file",
-			Detail:   fmt.Sprintf("The file %s could not be read.", filename),
-		})
+		p.lg.Error("failed to get read hcl path", "err", err, "filename", filename)
+		return nil, err
 	}
 
-	file, diags := p.p.ParseHCL(src, filename)
-	if file == nil || file.Body == nil {
-		return hcl.EmptyBody().(*hclsyntax.Body), diags
+	file, diag := p.p.ParseHCL(src, filename)
+	if file == nil || file.Body == nil || diag.HasErrors() {
+		p.lg.Error("fail to load config file")
+		return hcl.EmptyBody().(*hclsyntax.Body), errors.Join(diag.Errs()...)
 	}
 
-	return file.Body.(*hclsyntax.Body), diags
+	return file.Body.(*hclsyntax.Body), nil
 }
